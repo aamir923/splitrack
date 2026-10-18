@@ -1,0 +1,16 @@
+services:
+  user-db:
+    image: postgres:17
+    container_name: gave-user-db
+    environment:
+      POSTGRES_DB: gave_user
+      POSTGRES_USER: gave_service
+      POSTGRES_PASSWORD: ${gave_service_password}
+    ports:
+      - "5433:5432"
+    volumes:
+      - gave-user-db-data:/var/lib/postgresql/data
+
+volumes:
+  gave-user-db-data:
+
