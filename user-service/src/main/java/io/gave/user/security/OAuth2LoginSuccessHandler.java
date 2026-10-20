@@ -2,6 +2,8 @@ package io.gave.user.security;
 
 import io.gave.user.domain.AuthProvider;
 import io.gave.user.domain.User;
+import io.gave.user.exception.AccountDeletedException;
+import io.gave.user.exception.UnverifiedEmailException;
 import io.gave.user.service.ProviderProfile;
 import io.gave.user.service.UserProvisioningService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -56,13 +59,21 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                 oidcUser.getPicture(),
                 oidcUser.getLocale());
 
-        User user = provisioningService.provision(profile);
+        User user;
+        try {
+            user = provisioningService.provision(profile);
+        }
+        catch (AccountDeletedException | UnverifiedEmailException e) {
+            log.warn("Login rejected: {}", e.getMessage());
+            ProblemResponseWriter.write(response, HttpStatus.FORBIDDEN, "This account cannot sign in");
+            return;
+        }
         log.info("Login complete for user {}", user.getId());
 
         String device = Objects.toString(request.getHeader(HttpHeaders.USER_AGENT), "unknown");
         String token = sessions.create(user.getId(), device);
 
-        ResponseCookie cookie = ResponseCookie.from(SessionAuthenticationFilter.COOKIE_NAME, token)
+        ResponseCookie cookie = ResponseCookie.from(SessionStore.COOKIE_NAME, token)
                 .httpOnly(true)
                 .secure(cookieSecure)
                 .sameSite("Lax")

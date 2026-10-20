@@ -12,13 +12,13 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 @Component
 public class SessionStore {
 
+    public static final String COOKIE_NAME = "SESSION";
     private static final String SESSION = "session:";
     private static final String USER_SESSIONS = "user_sessions:";
 
@@ -45,19 +45,11 @@ public class SessionStore {
         return token;
     }
 
-    public Optional<UUID> resolve(String token) {
-        Object userId = redis.opsForHash().get(SESSION + hash(token), "userId");
-        return userId == null
-                ? Optional.empty()
-                : Optional.of(UUID.fromString(userId.toString()));
-    }
-
-    public void revoke(String token) {
-        String id = hash(token);
-        Object userId = redis.opsForHash().get(SESSION + id, "userId");
-        redis.delete(SESSION + id);
+    public void revoke(String sessionId) {
+        Object userId = redis.opsForHash().get(SESSION + sessionId, "userId");
+        redis.delete(SESSION + sessionId);
         if (userId != null) {
-            redis.opsForSet().remove(USER_SESSIONS + userId, id);
+            redis.opsForSet().remove(USER_SESSIONS + userId, sessionId);
         }
     }
 

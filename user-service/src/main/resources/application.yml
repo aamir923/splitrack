@@ -28,11 +28,18 @@ spring:
               - openid
               - profile
               - email
+            redirect-uri: ${GAVE_PUBLIC_BASE_URL:http://localhost:8080}/login/oauth2/code/google
 
 gave:
   session:
     ttl: 30d
     cookie-secure: false
+  jwt:
+    public-key: file:${user.home}/.gave/keys/jwt-public.pem
+    issuer: gave-gateway
+    audience: gave-services
 
 server:
   port: 8081
+  tomcat:
+    use-relative-redirects: true

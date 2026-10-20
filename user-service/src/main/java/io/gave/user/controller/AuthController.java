@@ -1,19 +1,17 @@
 package io.gave.user.controller;
 
-import io.gave.user.security.SessionAuthenticationFilter;
+import io.gave.user.security.CurrentUser;
 import io.gave.user.security.SessionStore;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
@@ -26,17 +24,14 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    Map<String, Object> me(Authentication authentication) {
-        return Map.of("userId", authentication.getPrincipal());
+    Map<String, Object> me(@AuthenticationPrincipal CurrentUser user) {
+        return Map.of("userId", user.userId());
     }
 
     @PostMapping("/auth/logout")
-    ResponseEntity<Void> logout(HttpServletRequest request) {
-        String token = SessionAuthenticationFilter.extractToken(request);
-        if (token != null) {
-            sessions.revoke(token);
-        }
-        ResponseCookie expired = ResponseCookie.from(SessionAuthenticationFilter.COOKIE_NAME, "")
+    ResponseEntity<Void> logout(@AuthenticationPrincipal CurrentUser user) {
+        sessions.revoke(user.sessionId());
+        ResponseCookie expired = ResponseCookie.from(SessionStore.COOKIE_NAME, "")
                 .path("/")
                 .maxAge(0)
                 .build();
@@ -46,8 +41,8 @@ public class AuthController {
     }
 
     @PostMapping("/auth/logout-all")
-    ResponseEntity<Void> logoutAll(Authentication authentication) {
-        sessions.revokeAll((UUID) authentication.getPrincipal());
+    ResponseEntity<Void> logoutAll(@AuthenticationPrincipal CurrentUser user) {
+        sessions.revokeAll(user.userId());
         return ResponseEntity.noContent().build();
     }
 }
