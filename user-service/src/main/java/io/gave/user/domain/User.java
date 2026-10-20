@@ -74,6 +74,18 @@ public class User {
         return status == UserStatus.DELETED;
     }
 
+    public void updateProfile(String displayName, String defaultCurrency, String locale) {
+        if (displayName != null) {
+            this.displayName = displayName;
+        }
+        if (defaultCurrency != null) {
+            this.defaultCurrency = defaultCurrency;
+        }
+        if (locale != null) {
+            this.locale = locale;
+        }
+    }
+
     public void activate(String displayName, String avatarUrl) {
         this.status = UserStatus.ACTIVE;
         this.displayName = displayName;

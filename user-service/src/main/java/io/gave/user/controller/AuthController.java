@@ -6,12 +6,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -21,11 +18,6 @@ public class AuthController {
 
     public AuthController(SessionStore sessions) {
         this.sessions = sessions;
-    }
-
-    @GetMapping("/me")
-    Map<String, Object> me(@AuthenticationPrincipal CurrentUser user) {
-        return Map.of("userId", user.userId());
     }
 
     @PostMapping("/auth/logout")
