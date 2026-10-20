@@ -156,3 +156,29 @@ Model the software around the business problem, in the business's own words.
 - Secrets (Google client secret, JWT private key, DB passwords) only in server environment variables / a secret manager, never in the repo.
 - Cap AI usage (rate limits, per-user quotas) so a public demo cannot run up API costs.
 - Repo quality: README with screenshot/GIF, architecture diagram, run-locally steps; tests for core logic (split/balance calculations); CI (GitHub Actions) building and testing on every push; docs folder records design decisions.
+
+## 23. Auth decision: opaque tokens at the edge, JWT inside the cluster
+Decided 2026-10-20 (supersedes the "own JWT validated by gateway" plan in section 19/20 for client-facing auth).
+- **Edge (client <-> gateway):** opaque random token, stored server-side in Redis (key -> user id, device, expiry). Web may carry it in an HttpOnly cookie, the mobile app in `Authorization: Bearer <token>`. Same value, one flow for both clients.
+- **Inside the cluster (gateway -> services, service -> service):** gateway looks the token up in Redis, then mints a short-lived internal JWT (RS256, `sub` = user UUID, tiny TTL) and forwards it. Services verify it locally with the public key; they never touch Redis or the client token.
+- **Why:** instant revocation / "log out all devices" (delete the user's Redis keys), device list for free, no refresh-token rotation logic, nothing readable in the client credential. Internal JWT keeps services stateless and lets them trust a signed identity instead of a plain `X-User-Id` header (defence in depth).
+- **Rule:** only the gateway validates client credentials. Services never parse client tokens; they must be unreachable except through the gateway (internal Docker network, no published ports).
+- **Cost:** Redis becomes a hard dependency of login/every request (persistence + replication in production). One Redis lookup per request.
+- **Swappable:** because auth lives at the gateway, the edge mechanism can be changed later without touching downstream services.
+- **Redis licensing:** free to self-host (Docker). Valkey is the BSD-licensed drop-in fork if licensing matters. Managed free tiers exist (Redis Cloud, Upstash); check current limits.
+- **Google sign-in:** web = authorization-code flow; mobile = native Google SDK ID token posted to the backend (`POST /auth/google`), verified, then an opaque token issued. Accept both client IDs as valid audiences.
+- **Pending:** Redis container in infra compose, Spring Data Redis session store in user-service, gateway auth filter, internal JWT minting, logout / logout-all endpoints, replace stage-1 cookie JWT.
+
+## 24. Redis session store, implemented in user-service (stage 2)
+- **Token:** 32 random bytes from `SecureRandom`, Base64-URL encoded. Unguessable; carries no data (opaque).
+- **Redis stores only the SHA-256 hash of the token** (`session:<hash>` -> hash of `userId`, `device`, with a TTL). A Redis leak or dump then does not hand out usable logins; same idea as storing password hashes.
+- **Per-user index:** `user_sessions:<userId>` is a set of that user's session hashes. It powers logout-all and a future "your devices" screen. Expired sessions leave stale ids in the set; harmless because `revokeAll` deletes them anyway.
+- **One credential, two transports:** the filter accepts `Authorization: Bearer <token>` (mobile) or the `SESSION` cookie (web). Same value, same Redis lookup.
+- **Cookie:** `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` via `gave.session.cookie-secure` (true in production).
+- **Filter is created with `new` inside `SecurityConfig`, not `@Component`:** Spring Boot also registers any `Filter` bean in the servlet container, so it could run outside the security chain.
+- **Login handshake session:** OAuth2 login needs an HTTP session for `state`/`nonce`; the success handler invalidates it after issuing our token.
+- **Revocation:** logout deletes one session; logout-all deletes every session of the user, effective on the very next request (no waiting for expiry like a JWT).
+- **Known gaps:** CSRF is ignored for `/api/auth/**` as a stopgap (cookie auth on state-changing endpoints needs real CSRF protection); no sliding expiry; no mobile `POST /auth/google` yet; validation still lives in user-service and moves to the gateway.
+- **Gotcha (config):** Spring Boot does NOT fail on an unresolved `${VAR}` in a bound property; it keeps the literal text. A missing `GAVE_REDIS_PASSWORD` in the IntelliJ run configuration made the password the string `${GAVE_REDIS_PASSWORD}`: the app started and `/api/health` worked, but the first Redis call (login) failed with WRONGPASS -> 500. Symptom: works until the first call that touches the dependency.
+- **Gotcha (secrets in .env):** Docker Compose and the shell strip the quotes around `"value"`; IntelliJ run-configuration env vars and Spring do not. Prefer plain alphanumeric/hex secrets (`openssl rand -hex 24`) so the same value can be pasted everywhere.
+- **Gotcha (compose):** changing a service's `command:`/env in the compose file does nothing until the container is recreated (`docker compose up -d <service>`); the running container keeps the old config.
