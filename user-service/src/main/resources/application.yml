@@ -5,6 +5,12 @@ spring:
     url: jdbc:postgresql://localhost:5433/gave_user
     username: gave_service
     password: ${GAVE_SERVICE_PASSWORD}
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      username: gave_redis_service
+      password: ${GAVE_REDIS_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -22,6 +28,18 @@ spring:
               - openid
               - profile
               - email
+            redirect-uri: ${GAVE_PUBLIC_BASE_URL:http://localhost:8080}/login/oauth2/code/google
+
+gave:
+  session:
+    ttl: 30d
+    cookie-secure: false
+  jwt:
+    public-key: file:${user.home}/.gave/keys/jwt-public.pem
+    issuer: gave-gateway
+    audience: gave-services
 
 server:
   port: 8081
+  tomcat:
+    use-relative-redirects: true

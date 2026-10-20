@@ -2,18 +2,27 @@ package io.gave.user.security;
 
 import io.gave.user.domain.AuthProvider;
 import io.gave.user.domain.User;
+import io.gave.user.exception.AccountDeletedException;
+import io.gave.user.exception.UnverifiedEmailException;
 import io.gave.user.service.ProviderProfile;
 import io.gave.user.service.UserProvisioningService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.Objects;
 
 @Component
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
@@ -21,9 +30,18 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private static final Logger log = LoggerFactory.getLogger(OAuth2LoginSuccessHandler.class);
 
     private final UserProvisioningService provisioningService;
+    private final SessionStore sessions;
+    private final Duration ttl;
+    private final boolean cookieSecure;
 
-    public OAuth2LoginSuccessHandler(UserProvisioningService provisioningService) {
+    public OAuth2LoginSuccessHandler(UserProvisioningService provisioningService,
+                                     SessionStore sessions,
+                                     @Value("${gave.session.ttl}") Duration ttl,
+                                     @Value("${gave.session.cookie-secure}") boolean cookieSecure) {
         this.provisioningService = provisioningService;
+        this.sessions = sessions;
+        this.ttl = ttl;
+        this.cookieSecure = cookieSecure;
     }
 
     @Override
@@ -41,9 +59,35 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                 oidcUser.getPicture(),
                 oidcUser.getLocale());
 
-        User user = provisioningService.provision(profile);
+        User user;
+        try {
+            user = provisioningService.provision(profile);
+        }
+        catch (AccountDeletedException | UnverifiedEmailException e) {
+            log.warn("Login rejected: {}", e.getMessage());
+            ProblemResponseWriter.write(response, HttpStatus.FORBIDDEN, "This account cannot sign in");
+            return;
+        }
         log.info("Login complete for user {}", user.getId());
 
-        response.sendRedirect("/api/health");
+        String device = Objects.toString(request.getHeader(HttpHeaders.USER_AGENT), "unknown");
+        String token = sessions.create(user.getId(), device);
+
+        ResponseCookie cookie = ResponseCookie.from(SessionStore.COOKIE_NAME, token)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(ttl)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        // the login handshake needed the HTTP session for state/nonce; we don't want it afterwards
+        HttpSession handshake = request.getSession(false);
+        if (handshake != null) {
+            handshake.invalidate();
+        }
+
+        response.sendRedirect("/api/me");
     }
 }
