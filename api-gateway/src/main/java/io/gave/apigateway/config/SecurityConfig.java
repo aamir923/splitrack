@@ -49,6 +49,9 @@ public class SecurityConfig {
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
+                        // internal service-to-service endpoints must never be reachable from outside,
+                        // even if a broad route is added to the route table later
+                        .requestMatchers("/internal/**").denyAll()
                         .requestMatchers("/api/health", "/oauth2/**", "/login/**", "/error").permitAll()
                         .anyRequest().authenticated());
         return http.build();

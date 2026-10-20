@@ -30,6 +30,9 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/error").permitAll()
+                        // service-to-service endpoints: a valid JWT today (relayed from the user's request);
+                        // this is the single place to require a service scope later
+                        .requestMatchers("/internal/**").authenticated()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 .oauth2ResourceServer(resourceServer -> resourceServer
