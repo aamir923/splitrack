@@ -13,6 +13,18 @@ services:
     volumes:
       - gave-user-db-data:/var/lib/postgresql/data
 
+  group-db:
+    image: postgres:17
+    container_name: gave-group-db
+    environment:
+      POSTGRES_DB: gave_group
+      POSTGRES_USER: gave_group_service
+      POSTGRES_PASSWORD: ${GAVE_GROUP_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - gave-group-db-data:/var/lib/postgresql/data
+
   redis:
     image: redis:7
     container_name: gave-redis
@@ -38,5 +50,6 @@ services:
 
 volumes:
   gave-user-db-data:
+  gave-group-db-data:
   gave-redis-data:
 

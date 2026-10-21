@@ -21,6 +21,7 @@
     <modules>
         <module>user-service</module>
         <module>api-gateway</module>
+        <module>group-service</module>
     </modules>
 
     <properties>
