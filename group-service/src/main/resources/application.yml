@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: group-service
+  datasource:
+    url: ${GROUP_DATABASE_URL:jdbc:postgresql://localhost:5434/gave_group}
+    username: gave_group_service
+    password: ${GAVE_GROUP_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 2000
+      validation-timeout: 1000
+      data-source-properties:
+        connectTimeout: 2
+        socketTimeout: 5
+        options: -c statement_timeout=3000 -c lock_timeout=2000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      jakarta.persistence.query.timeout: 3000
+  flyway:
+    enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  port: 8082
+  shutdown: graceful
+
+gave:
+  jwt:
+    public-key: file:${user.home}/.gave/keys/jwt-public.pem
+    issuer: gave-gateway
+    audience: gave-services
+  services:
+    user-service:
+      url: ${USER_SERVICE_BASE_URL:http://localhost:8081}
+      connect-timeout: 2s
+      read-timeout: 3s
