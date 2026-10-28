@@ -38,3 +38,8 @@ gave:
       url: ${USER_SERVICE_BASE_URL:http://localhost:8081}
       connect-timeout: 2s
       read-timeout: 3s
+
+logging:
+  level:
+    # PostgreSQL error details can contain complete failing rows and membership IDs.
+    org.hibernate.orm.jdbc.error: "OFF"
