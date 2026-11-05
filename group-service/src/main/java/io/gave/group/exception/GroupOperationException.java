@@ -4,7 +4,10 @@ import org.springframework.http.HttpStatus;
 
 public class GroupOperationException extends RuntimeException {
     public enum Code {
+        INVALID_REQUEST(HttpStatus.BAD_REQUEST, "Invalid request"),
+        INACTIVE_CALLER(HttpStatus.FORBIDDEN, "This account is not active"),
         GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "Group not found"),
+        USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
         MEMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "User is already a group member");
 
         private final HttpStatus status;

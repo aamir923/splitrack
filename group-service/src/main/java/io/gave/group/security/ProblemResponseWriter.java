@@ -3,6 +3,7 @@ package io.gave.group.security;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,12 +27,17 @@ public class ProblemResponseWriter {
         response.setHeader(RequestIdFilter.HEADER, id);
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write(mapper.writeValueAsString(Map.of(
+        response.getWriter().write(mapper.writeValueAsString(body(request, status, code, detail)));
+    }
+
+    public Map<String, Object> body(HttpServletRequest request, HttpStatusCode status, String code, String detail) {
+        HttpStatus known = HttpStatus.resolve(status.value());
+        return Map.of(
                 "type", "about:blank",
-                "title", status.getReasonPhrase(),
+                "title", known == null ? "Request failed" : known.getReasonPhrase(),
                 "status", status.value(),
                 "detail", detail,
                 "code", code,
-                "requestId", id)));
+                "requestId", RequestIdFilter.requestId(request));
     }
 }
