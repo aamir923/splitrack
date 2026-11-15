@@ -56,6 +56,18 @@ public class RouteConfig {
                 .build();
     }
 
+    @Bean
+    RouterFunction<ServerResponse> groupServiceApiRoutes(
+            @Value("${gave.services.group-service.url}") String groupServiceUrl,
+            InternalTokenService tokens){
+        RequestPredicate apiPaths = RequestPredicates.path("/api/groups/**");
+        return route("group-service-api")
+                .route(apiPaths, http())
+                .before(uri(groupServiceUrl))
+                .before(internalCredentials(tokens))
+                .build();
+    }
+
     private static Function<ServerRequest, ServerRequest> dropClientAuthorization() {
         return request -> ServerRequest.from(request)
                 .headers(headers -> headers.remove(HttpHeaders.AUTHORIZATION))
